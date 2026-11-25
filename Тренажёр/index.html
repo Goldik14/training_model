@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101829">
+  <title>Тренажёр по моделированию</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./questions.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="layout">
+    <header class="masthead">
+      <div class="mark" aria-hidden="true">∿</div>
+      <div>
+        <p class="site-name">Тренажёр</p>
+        <h1>Моделирование систем</h1>
+      </div>
+    </header>
+    <aside class="sidebar" aria-label="Режим и прогресс">
+      <nav class="modes" aria-label="Режим тренировки">
+        <button type="button" data-mode="cards" aria-pressed="true">
+          <span class="mode-icon icon-cards" aria-hidden="true"></span>
+          <span class="mode-copy"><strong>Карточки</strong><span>Вспомни и сверь ответ</span></span>
+        </button>
+        <button type="button" data-mode="quiz" aria-pressed="false">
+          <span class="mode-icon icon-quiz" aria-hidden="true"></span>
+          <span class="mode-copy"><strong>Тест</strong><span>Пройди без ошибок</span></span>
+        </button>
+      </nav>
+      <div class="progress-panel">
+        <div class="progress-label">
+          <span id="progress-title">Просмотрено</span>
+          <output id="progress-count" aria-live="polite">0 / 57</output>
+        </div>
+        <progress id="progress" aria-labelledby="progress-title" value="0" max="57"></progress>
+      </div>
+    </aside>
+    <main id="study" class="study" aria-label="Тренировка"></main>
+    <noscript>Для тренажёра нужно включить JavaScript.</noscript>
+  </div>
+</body>
+</html>
