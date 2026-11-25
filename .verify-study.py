@@ -2,7 +2,7 @@ from pathlib import Path
 import random
 from playwright.sync_api import sync_playwright
 
-path = Path(__file__).resolve().parent / "Тренажёр" / "index.html"
+path = Path(__file__).resolve().parent / "index.html"
 browser_path = Path.home() / "AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe"
 
 with sync_playwright() as playwright:
@@ -34,7 +34,7 @@ with sync_playwright() as playwright:
     assert page.locator("#progress-count").inner_text() == "0 / 57"
 
     page.get_by_role("button", name="Тест").click()
-    page.screenshot(path=str(path.parent.parent / ".quiz-desktop-check.png"))
+    page.screenshot(path=str(path.parent / ".quiz-desktop-check.png"))
     first = page.locator("h2").inner_html()
 
     def answer_label():
@@ -75,7 +75,7 @@ with sync_playwright() as playwright:
         page.get_by_role("button", name="Показать ответ").click()
         assert page.evaluate("document.documentElement.scrollWidth === innerWidth"), prompt
         if page.locator(".formula").count():
-            page.screenshot(path=str(path.parent.parent / ".flashcard-mobile-check.png"))
+            page.screenshot(path=str(path.parent / ".flashcard-mobile-check.png"))
         page.get_by_role("button", name="Следующая карточка" if question != bank[-1] else "Завершить колоду").click()
     assert not errors, errors
     browser.close()

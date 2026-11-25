@@ -28,7 +28,7 @@ const document = {
 };
 const context = vm.createContext({ window: {}, document });
 for (const file of ["questions.js", "app.js"]) {
-  vm.runInContext(readFileSync(new URL("./Тренажёр/" + file, import.meta.url), "utf8"), context);
+  vm.runInContext(readFileSync(new URL("./" + file, import.meta.url), "utf8"), context);
 }
 const bank = context.window.questionBank;
 assert.equal(bank.length, 57);

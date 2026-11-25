@@ -349,6 +349,6 @@ for (const [index, choices] of distractors.entries()) {
   if (number !== choices.length) throw Error("Question count mismatch");
 }
 const lines = questionBank.map(question => "  " + JSON.stringify(question));
-writeFileSync(new URL("./Тренажёр/questions.js", import.meta.url),
+writeFileSync(new URL("./questions.js", import.meta.url),
   "// Вопросы и развёрнутые ответы из двух опросов. Первый вариант в choices верный.\n"
   + "window.questionBank = [\n" + lines.join(",\n") + "\n];\n");
