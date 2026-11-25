@@ -290,23 +290,103 @@ const distractors = [
   ]
 ];
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const { renderToString } = await import(pathToFileURL(process.argv[2]));
-const escapes = { "&": "&amp;", "<": "&lt;", ">": "&gt;" };
+const [katexPath, playwrightPath, chromiumPath] = process.argv.slice(2);
+if (!katexPath || !playwrightPath || !chromiumPath) {
+  throw new Error("Usage: node .build-study-bank.mjs <KaTeX module> <Playwright entry point> <Chromium executable>");
+}
+const { renderToString } = await import(pathToFileURL(katexPath));
+const { chromium } = await import(pathToFileURL(playwrightPath));
+const escapes = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+const escapeHtml = text => text.replace(/[&<>"]/g, character => escapes[character]);
+const formulas = new Map();
 
 function math(tex, displayMode = false) {
-  const rendered = renderToString(tex.trim(), { displayMode, output: "mathml", strict: "error" });
-  return rendered.match(/<math\b[\s\S]*<\/math>/)[0].replace(/<annotation\b[\s\S]*?<\/annotation>/, "");
+  const source = tex.trim();
+  const id = createHash("sha256").update(JSON.stringify([source, displayMode])).digest("hex").slice(0, 16);
+  if (!formulas.has(id)) {
+    const rendered = renderToString(source, { displayMode, output: "mathml", strict: "error" });
+    const markup = rendered.match(/<math\b[\s\S]*<\/math>/)[0];
+    formulas.set(id, { source, markup, displayMode });
+  }
+  return "{{formula:" + id + "}}";
 }
 
 function inline(text) {
   return text.split(/(\$[^$\n]+\$|\*\*[^*\n]+\*\*)/).map(part => {
     if (part.startsWith("$") && part.endsWith("$")) return math(part.slice(1, -1));
     if (part.startsWith("**") && part.endsWith("**")) return "<strong>" + inline(part.slice(2, -2)) + "</strong>";
-    return part.replace(/[&<>]/g, character => escapes[character]);
+    return escapeHtml(part);
   }).join("");
+}
+
+const choiceFormulas = new Map([
+  ["arccos((a · b) / (‖a‖‖b‖))", String.raw`\arccos\left(\frac{\vec a\cdot\vec b}{\|\vec a\|\|\vec b\|}\right)`],
+  ["arcsin((a · b) / (‖a‖‖b‖))", String.raw`\arcsin\left(\frac{\vec a\cdot\vec b}{\|\vec a\|\|\vec b\|}\right)`],
+  ["arccos((a · b) × ‖a‖‖b‖)", String.raw`\arccos\left((\vec a\cdot\vec b)\|\vec a\|\|\vec b\|\right)`],
+  ["½‖a‖‖b‖ sin φ", String.raw`\frac12\|\vec a\|\|\vec b\|\sin\varphi`],
+  ["‖a‖‖b‖ sin φ", String.raw`\|\vec a\|\|\vec b\|\sin\varphi`],
+  ["‖a‖‖b‖ cos φ", String.raw`\|\vec a\|\|\vec b\|\cos\varphi`],
+  ["‖a‖", String.raw`\|\vec a\|`],
+  ["(1, 2)", "(1,2)"],
+  ["(3, 6)", "(3,6)"],
+  ["(2, 1)", "(2,1)"],
+  ["(1, 0)", "(1,0)"],
+  ["(0, 1)", "(0,1)"],
+  ["90°", String.raw`90^\circ`],
+  ["180°", String.raw`180^\circ`],
+  ["0°", String.raw`0^\circ`],
+  ["2×2", String.raw`2\times 2`],
+  ["3×3", String.raw`3\times 3`],
+  ["ad − bc", "ad-bc"],
+  ["ad + bc", "ad+bc"],
+  ["+, −, +", "+,-,+"],
+  ["x″ + ω₀²x = 0", "x''+\\omega_0^2x=0"],
+  ["x″ − ω₀²x = 0", "x''-\\omega_0^2x=0"],
+  ["x′ + ω₀²x = 0", "x'+\\omega_0^2x=0"],
+  ["x = e^(λt)", "x=e^{\\lambda t}"],
+  ["x(0)", "x(0)"],
+  ["Av = λv", "Av=\\lambda v"],
+  ["Av = v", "Av=v"],
+  ["Av = 0", "Av=0"],
+  ["|λ|", "|\\lambda|"],
+  ["λ < 0", "\\lambda<0"],
+  ["det(A − λI) = 0", "\\det(A-\\lambda I)=0"],
+  ["(A − λI)v = 0", "(A-\\lambda I)v=0"],
+  ["yₙ₊₁ = yₙ + h f(tₙ, yₙ)", "y_{n+1}=y_n+h f(t_n,y_n)"],
+  ["1:2:2:1", "1:2:2:1"],
+  ["r = b − A·x̃", "r=b-A\\tilde x"],
+  ["1/√N", "\\frac{1}{\\sqrt N}"],
+  ["1/N", "\\frac{1}{N}"],
+  ["√N", "\\sqrt N"],
+  ["λ", "\\lambda"],
+  ["−k", "-\\mathbf k"],
+  ["k", "\\mathbf k"],
+  ["i", "\\mathbf i"],
+  ["Av", "Av"],
+  ["v", "v"],
+  ["c", "c"],
+  ["A", "A"],
+  ["N", "N"],
+]);
+const choicePattern = new RegExp([...choiceFormulas.keys()]
+  .sort((a, b) => b.length - a.length)
+  .map(formula => {
+    const pattern = formula.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return /^[a-zA-Z]+$/.test(formula) ? "\\b" + pattern + "\\b" : pattern;
+  }).join("|"), "g");
+
+function choiceHtml(text) {
+  let html = "";
+  let offset = 0;
+  for (const { 0: match, index } of text.matchAll(choicePattern)) {
+    html += escapeHtml(text.slice(offset, index)) + math(choiceFormulas.get(match));
+    offset = index + match.length;
+  }
+  return html + escapeHtml(text.slice(offset));
 }
 
 function answerHtml(markdown) {
@@ -341,14 +421,53 @@ for (const [index, choices] of distractors.entries()) {
       survey,
       number,
       topic,
-      prompt: inline(prompt),
+      prompt: inline(prompt.replace("Av=λv", "$Av=\\lambda v$").replace(/\b[AN]\b/g, symbol =>
+        prompt.includes("Av=λv") ? symbol : "$" + symbol + "$")),
       answer: answerHtml(sections[section + 1].trim()),
-      choices: choices[number - 1],
+      choices: choices[number - 1].map(choiceHtml),
     });
   }
   if (number !== choices.length) throw Error("Question count mismatch");
 }
-const lines = questionBank.map(question => "  " + JSON.stringify(question));
+const assetDirectory = new URL("./formulas/", import.meta.url);
+const fontSize = 24;
+const browser = await chromium.launch({ executablePath: chromiumPath, chromiumSandbox: true });
+const images = new Map();
+try {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 650 }, deviceScaleFactor: 3 });
+  const content = [...formulas].map(([id, { markup, displayMode }]) => (
+    '<div><div class="frame" id="f-' + id + '">' + markup
+      + (displayMode ? "" : '<i class="baseline"></i>') + "</div></div>"
+  )).join("\n");
+  await page.setContent('<style>html,body{background:transparent;margin:0;color:#e6edff;}'
+    + ".frame{display:inline-block;font-size:" + fontSize + "px;padding:3px;}"
+    + ".baseline{display:inline-block;width:0;height:0;vertical-align:baseline;}</style>" + content);
+  await page.evaluate(() => document.fonts.ready);
+  for (const [id, { source, displayMode }] of formulas) {
+    const frame = page.locator("#f-" + id);
+    const geometry = await frame.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      const marker = element.querySelector(".baseline");
+      return { width: rect.width, depth: marker ? rect.bottom - marker.getBoundingClientRect().top : 0 };
+    });
+    const png = await frame.screenshot({ omitBackground: true, animations: "disabled" });
+    images.set(id, { png, tag: '<img class="formula-image" src="./formulas/' + id + '.png" alt="'
+      + escapeHtml(source.replace(/\s+/g, " ")) + '" style="width:' + (geometry.width / fontSize).toFixed(3)
+      + "em;vertical-align:-" + (geometry.depth / fontSize).toFixed(3) + 'em">' });
+  }
+} finally {
+  await browser.close();
+}
+
+mkdirSync(assetDirectory, { recursive: true });
+for (const [id, image] of images) writeFileSync(new URL(id + ".png", assetDirectory), image.png);
+const insertImages = html => html.replace(/\{\{formula:([a-f0-9]+)\}\}/g, (_, id) => images.get(id).tag);
+const lines = questionBank.map(question => "  " + JSON.stringify({
+  ...question,
+  prompt: insertImages(question.prompt),
+  answer: insertImages(question.answer),
+  choices: question.choices.map(insertImages),
+}));
 writeFileSync(new URL("./questions.js", import.meta.url),
   "// Вопросы и развёрнутые ответы из двух опросов. Первый вариант в choices верный.\n"
   + "window.questionBank = [\n" + lines.join(",\n") + "\n];\n");

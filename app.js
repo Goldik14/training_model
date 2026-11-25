@@ -7,6 +7,7 @@
   const progressTitle = document.querySelector("#progress-title");
   const progressCount = document.querySelector("#progress-count");
   const modeButtons = document.querySelectorAll("[data-mode]");
+  const quizSurveys = document.querySelector("#quiz-surveys");
 
   function shuffled(items) {
     const result = [...items];
@@ -18,7 +19,7 @@
   }
 
   function makeTestItem(question, binary) {
-    const options = shuffled(question.choices.map((text, index) => ({ text, correct: index === 0 })));
+    const options = shuffled(question.choices.map((html, index) => ({ html, correct: index === 0 })));
     if (!binary) return { question, options };
 
     const statement = Math.random() < 0.5
@@ -30,14 +31,14 @@
       question,
       statement,
       options: [
-        { text: "Верно", correct },
-        { text: "Неверно", correct: !correct },
+        { html: "Верно", correct },
+        { html: "Неверно", correct: !correct },
       ],
     };
   }
 
-  function start(mode) {
-    const deck = shuffled(bank);
+  function start(mode, survey = 0) {
+    const deck = shuffled(survey ? bank.filter(question => question.survey === survey) : bank);
     return {
       deck: mode === "quiz"
         ? deck.map((question, index) => makeTestItem(question, index % 2 === 1))
@@ -49,7 +50,8 @@
   }
 
   let mode = "cards";
-  const sessions = { cards: start("cards"), quiz: start("quiz") };
+  let quizSurvey = Number(quizSurveys.querySelector("input:checked").value);
+  const sessions = { cards: start("cards"), quiz: start("quiz", quizSurvey) };
 
   function add(parent, tag, className, text) {
     const element = document.createElement(tag);
@@ -95,7 +97,7 @@
   }
 
   function again() {
-    sessions[mode] = start(mode);
+    sessions[mode] = start(mode, mode === "quiz" ? quizSurvey : 0);
     render(true);
   }
 
@@ -132,10 +134,10 @@
     }
 
     add(study, "p", "prompt", statement ? "Это правильный ответ?" : "Выбери один правильный ответ");
-    if (statement) add(study, "p", "statement", statement);
+    if (statement) add(study, "p", "statement").innerHTML = statement;
     const controls = add(study, "div", statement ? "options binary" : "options");
     for (const option of options) {
-      button(controls, option.text, () => {
+      const control = button(controls, "", () => {
         if (option.correct) {
           next(session);
         } else {
@@ -143,12 +145,14 @@
           render(true);
         }
       }, "option");
+      control.innerHTML = option.html;
     }
     return title;
   }
 
   function render(focus = false) {
     const session = sessions[mode];
+    quizSurveys.hidden = mode !== "quiz";
     const completed = session.mistake ? 0 : session.index + Number(session.revealed);
     progressTitle.textContent = mode === "cards" ? "Просмотрено" : "Верных подряд";
     progress.max = session.deck.length;
@@ -181,5 +185,10 @@
       render(true);
     });
   }
+  quizSurveys.addEventListener("change", event => {
+    quizSurvey = Number(event.target.value);
+    sessions.quiz = start("quiz", quizSurvey);
+    render();
+  });
   render();
 })();

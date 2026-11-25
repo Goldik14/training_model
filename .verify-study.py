@@ -1,12 +1,12 @@
 from pathlib import Path
-import random
+from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
 
 path = Path(__file__).resolve().parent / "index.html"
 browser_path = Path.home() / "AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe"
 
-with sync_playwright() as playwright:
-    browser = playwright.chromium.launch(executable_path=str(browser_path), headless=True)
+with TemporaryDirectory() as artifacts, sync_playwright() as playwright:
+    browser = playwright.chromium.launch(executable_path=str(browser_path), headless=True, chromium_sandbox=True)
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
@@ -34,16 +34,20 @@ with sync_playwright() as playwright:
     assert page.locator("#progress-count").inner_text() == "0 / 57"
 
     page.get_by_role("button", name="Тест").click()
-    page.screenshot(path=str(path.parent / ".quiz-desktop-check.png"))
     first = page.locator("h2").inner_html()
 
     def answer_label():
         question = by_prompt[page.locator("h2").inner_html()]
         if page.locator(".statement").count():
-            return "Верно" if page.locator(".statement").inner_text() == question["choices"][0] else "Неверно"
+            return "Верно" if page.locator(".statement").inner_html() == question["choices"][0] else "Неверно"
         return question["choices"][0]
 
-    page.get_by_role("button", name=answer_label(), exact=True).click()
+    def click_correct_option():
+        options = page.locator(".option")
+        labels = options.evaluate_all("buttons => buttons.map(button => button.innerHTML)")
+        options.nth(labels.index(answer_label())).click()
+
+    click_correct_option()
     assert page.locator("#progress-count").inner_text() == "1 / 57"
     second = page.locator("h2").inner_html()
     assert page.locator(".options.binary .option").count() == 2
@@ -59,7 +63,7 @@ with sync_playwright() as playwright:
     for index in range(57):
         quiz.append(page.locator("h2").inner_html())
         assert page.locator(".option").count() == (3 if index % 2 == 0 else 2)
-        page.get_by_role("button", name=answer_label(), exact=True).click()
+        click_correct_option()
         assert page.locator("#progress-count").inner_text() == f"{index + 1} / 57"
     assert len(set(quiz)) == 57
     assert page.locator("h2").inner_text() == "Тест пройден"
@@ -75,7 +79,7 @@ with sync_playwright() as playwright:
         page.get_by_role("button", name="Показать ответ").click()
         assert page.evaluate("document.documentElement.scrollWidth === innerWidth"), prompt
         if page.locator(".formula").count():
-            page.screenshot(path=str(path.parent / ".flashcard-mobile-check.png"))
+            page.screenshot(path=str(Path(artifacts) / "flashcard-mobile.png"))
         page.get_by_role("button", name="Следующая карточка" if question != bank[-1] else "Завершить колоду").click()
     assert not errors, errors
     browser.close()
