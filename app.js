@@ -7,7 +7,6 @@
   const progressTitle = document.querySelector("#progress-title");
   const progressCount = document.querySelector("#progress-count");
   const modeButtons = document.querySelectorAll("[data-mode]");
-  const quizSurveys = document.querySelector("#quiz-surveys");
 
   function shuffled(items) {
     const result = [...items];
@@ -37,8 +36,8 @@
     };
   }
 
-  function start(mode, survey = 0) {
-    const deck = shuffled(survey ? bank.filter(question => question.survey === survey) : bank);
+  function start(mode) {
+    const deck = shuffled(bank);
     return {
       deck: mode === "quiz"
         ? deck.map((question, index) => makeTestItem(question, index % 2 === 1))
@@ -50,8 +49,7 @@
   }
 
   let mode = "cards";
-  let quizSurvey = Number(quizSurveys.querySelector("input:checked").value);
-  const sessions = { cards: start("cards"), quiz: start("quiz", quizSurvey) };
+  const sessions = { cards: start("cards"), quiz: start("quiz") };
 
   function add(parent, tag, className, text) {
     const element = document.createElement(tag);
@@ -75,7 +73,7 @@
   }
 
   function questionHeading(question) {
-    add(study, "p", "topic", question.topic + " · Опрос " + question.survey);
+    add(study, "p", "topic", question.topic);
     const element = heading();
     element.innerHTML = question.prompt;
     return element;
@@ -97,7 +95,7 @@
   }
 
   function again() {
-    sessions[mode] = start(mode, mode === "quiz" ? quizSurvey : 0);
+    sessions[mode] = start(mode);
     render(true);
   }
 
@@ -152,7 +150,6 @@
 
   function render(focus = false) {
     const session = sessions[mode];
-    quizSurveys.hidden = mode !== "quiz";
     const completed = session.mistake ? 0 : session.index + Number(session.revealed);
     progressTitle.textContent = mode === "cards" ? "Просмотрено" : "Верных подряд";
     progress.max = session.deck.length;
@@ -185,10 +182,5 @@
       render(true);
     });
   }
-  quizSurveys.addEventListener("change", event => {
-    quizSurvey = Number(event.target.value);
-    sessions.quiz = start("quiz", quizSurvey);
-    render();
-  });
   render();
 })();
