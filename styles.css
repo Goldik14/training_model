@@ -140,6 +140,7 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 1rem; }
 .binary .option { text-align: center; }
 .feedback { margin: 0 0 .8rem; color: #ffbfae; font-weight: 700; }
 .completion { line-height: 1.55; color: var(--muted); }
+.site-credit { grid-column: 1 / -1; color: var(--muted); font-size: .875rem; text-align: right; }
 @media (max-width: 44rem) {
   .layout { width: min(100% - 1.5rem, 38rem); grid-template-columns: minmax(0, 1fr); gap: 1rem; padding-top: 1.3rem; }
   .masthead { margin-bottom: .2rem; }
